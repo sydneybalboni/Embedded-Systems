@@ -39,6 +39,7 @@
 	.equ GPIOB_BASE, 0x40020400
 	.equ GPIO_MODER, 0x00
 	.equ GPIO_ODR, 0x14
+	.equ GPIO_BSRR, 0x18
 
 	.equ all_lights, 0xF7E0
 	.equ first_light, 0x20
@@ -50,11 +51,7 @@
 main:
 
 #R1 - Address
-#R2 - Scratch register
-#R3 - Mask register Clear
-#R4 - Mask register Set
-#R5 - Amount to turn on the first light
-#R7 - Current LED
+#R2 - LED output
 
 #0. Initialize Lights as outputs
 	#Turn on clock
@@ -85,29 +82,21 @@ main:
 start:
 
 #1. Turn on the first light
-	mov r5, #first_light
 	ldr r1, =GPIOB_BASE
-
-	#loading half-word
-	ldrh r2, [r1,#GPIO_ODR]
-
-#2. Delay
+	#ldrh r2, [r1,#GPIO_BSRR] dont need?
+	mov r2, #0x10001
 
 
-#3. Shift binary value
+
 shift_left:
-	add r7, #1
-	cmp r5, #0x800
+1:	strh r2, [r1,#GPIO_BSRR]
+	lsl r2, #1
+	cmp r2, #0x4000800
 	beq skip_eleven
-	bic r2, r2
-	orr r2, r2, r5
-	strh r2, [r1,#GPIO_ODR]
-	bl delay
-	lsl r5, #1
-	cmp r7, #11
-	bne shift_left
+	bal shift_left
 
 shift_right:
+	lsr r5, #1
 	sub r7, #1
 	cmp r5, #0x800
 	beq skip_eleven
@@ -115,14 +104,11 @@ shift_right:
 	orr r2, r2, r5
 	strh r2, [r1,#GPIO_ODR]
 	bl delay
-1:	lsr r5, #1
 	cmp r7, #0
-	bne shift_right
-	bal shift_left
+	beq shift_left
+	bal shift_right
 
 #4. Turn on the next light
-
-	bl delay
 
 #5. Hit last light and reverse directions
 
@@ -140,8 +126,12 @@ delay:
 	bne 1b
 	mov pc, lr
 
-skip_eleven:
-	add r7, #1
+skip_eleven_left:
+	lsl r2, #1
+	mov pc, lr
+
+skip_eleven_right:
+	lsr r2, #1
 	mov pc, lr
 
 #**********************************#
