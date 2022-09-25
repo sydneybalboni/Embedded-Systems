@@ -1,17 +1,21 @@
-# Sydney Balboni
-# CE2801-021
-# 9-19-2022
-#
-# KnightRiderLights.S
-# Recreates knight rider lights on the Embedded Systems board's LEDs
-
+/**
+******************************************************************************
+* Sydney Balboni
+* CE2801-021
+* 9-19-2022
+*
+* KnightRiderLights.S
+* Recreates knight rider lights on
+* the Embedded Systems board's LEDs
+******************************************************************************
+*/
 
 .syntax unified
 .cpu cortex-m4
 .thumb
 .section .text
 
-#************Psuedocode************#
+#*****************************************************************************
 
 #0. Initialize Lights as outputs
 
@@ -52,6 +56,7 @@ main:
 
 #R1 - Address
 #R2 - LED output
+#R3 - shift count
 
 #0. Initialize Lights as outputs
 	#Turn on clock
@@ -83,30 +88,58 @@ start:
 
 #1. Turn on the first light
 	ldr r1, =GPIOB_BASE
-	#ldrh r2, [r1,#GPIO_BSRR] dont need?
-	mov r2, #0x10001
+	ldrh r2, [r1,#GPIO_BSRR]
+	orr r2, #0
+	mov r3, #0
 
 
 
 shift_left:
-1:	strh r2, [r1,#GPIO_BSRR]
+	movw r2, #0x0020
+	movt r2, #0x0010
+
+1:	str r2, [r1,#GPIO_BSRR]
+	bl delay
+	cmp r3, #10
+	beq shift_right
 	lsl r2, #1
-	cmp r2, #0x4000800
-	beq skip_eleven
-	bal shift_left
+	add r3, #1
+	cmp r3, #6
+	bne 1b
+
+
+	movw r2, #0x1000
+	movt r2, #0x0400
+	str r2, [r1,#GPIO_BSRR]
+	bl delay
+	movw r2, #0x2000
+	movt r2, #0x1000
+	add r3, #2
+	bal 1b
+
 
 shift_right:
-	lsr r5, #1
-	sub r7, #1
-	cmp r5, #0x800
-	beq skip_eleven
-	bic r2, r2
-	orr r2, r2, r5
-	strh r2, [r1,#GPIO_ODR]
-	bl delay
-	cmp r7, #0
+	movw r2, #0x4000
+	movt r2, #0x8000
+	sub r3, #1
+
+1:	str r2, [r1,#GPIO_BSRR]
+	cmp r3, #0
 	beq shift_left
-	bal shift_right
+	bl delay
+	lsr r2, #1
+	sub r3, #1
+	cmp r3, #6
+	bne 1b
+
+	movw r2, #0x0400
+	movt r2, #0x1000
+	str r2, [r1,#GPIO_BSRR]
+	bl delay
+	movw r2, #0x0200
+	movt r2, #0x0400
+	sub r3, #2
+	bal 1b
 
 #4. Turn on the next light
 
@@ -119,22 +152,14 @@ shift_right:
 #************Subroutines************#
 
 delay:
-	movw r3, #0x0000
-	movt r3, #0x0020
+	movw r0, #0x0000
+	movt r0, #0x0008
 1:
-	subs r3,r3,#1
+	subs r0,r0,#1
 	bne 1b
-	mov pc, lr
+	bx lr
 
-skip_eleven_left:
-	lsl r2, #1
-	mov pc, lr
-
-skip_eleven_right:
-	lsr r2, #1
-	mov pc, lr
-
-#**********************************#
+#***********************************#
 
 
 
