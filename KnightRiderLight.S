@@ -16,6 +16,7 @@
 .section .text
 
 #***********Psuedocode*************#
+
 #0. Initialize Lights as outputs
 
 #1. Setup registers for program
@@ -55,8 +56,8 @@ main:
 #r3 - Shift count
 
 #0. Initialize Lights as outputs
-	#Turn on clock
 
+	#Turn on clock
 	#(1)Address
 	ldr r1, =RCC_BASE
 	#(2)Read
@@ -84,9 +85,10 @@ start:
 
 #1. Setup registers for program
 
-	# Read and reset BSRR register
+	# Reset BSRR register
 	ldrh r2, [r1,#GPIO_BSRR]
 	orr r2, #0
+	strh r2, [r1, #GPIO_BSRR]
 
 	# Initialize shift count to 0
 	mov r3, #0
