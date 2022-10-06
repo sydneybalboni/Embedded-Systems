@@ -19,6 +19,8 @@
 	.equ GPIO_ODR, 0x14
 
 	.equ clear_mask, 0x00000000
+	.equ set_mask, 0x7ff
+	.equ five_bits, 5
 
 .global led_init
 .global num_to_led
@@ -74,17 +76,17 @@ led_init:
 #	None
 num_to_led:
 
-	push {r0-r4}
+	push {r1-r5}
 
     #shift number over to match pins
-    lsl r0, r0, #5
+    lsl r0, r0, #five_bits
 
     #isolate upper bits and shift over
-    ubfx r4, r0, #11, #5
+    ubfx r4, r0, #11, #five_bits
     lsl r4, r4, #12
 
     #mask and add new register
-    mov r5, #0x7ff
+    mov r5, #set_mask
     and r0, r5
     add r0, r0, r4
 
@@ -96,5 +98,5 @@ num_to_led:
     strh r2, [r1, #GPIO_ODR]
 
 	#exit
-    pop {r0-r4}
+    pop {r1-r5}
     bx lr

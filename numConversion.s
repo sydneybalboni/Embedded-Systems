@@ -10,102 +10,124 @@
 .thumb
 .section .text
 
-	.equ display_Err, 0x539898
-	.equ num_to_ascii_convert, 0x20202020
-	.equ add_three, 0x30000
+	.equ display_Err, 0x53989846
+	.equ num_to_ascii_convert, 0x32
+	.equ largest_valid_number, 0x270F
+
+	.equ add_three_first_nibble, 0x30000
+	.equ add_three_second_nibble, 0x300000
+	.equ add_three_third_nibble, 0x3000000
+	.equ add_three_fourth_nibble, 0x30000000
+
+	.equ last_shift, 15
+	.equ five, 5
+
 
 .global num_to_ascii
-
-
 
 #num_to_ascii
 #Takes an interger from 0-9999 and turns it into ascii
 #Input:
-#	r0 - num
+#	r0 - num to turn into ascii
 #Ouput:
 #   r0 -num in ascii conversion
 #Dependancies:
 #   None
 num_to_ascii:
-
-	push {r1-r7, r12}
+	push {r1-r5, r12}
 
 	#check for invalid number
-	mov r2, #0x270f
+	ldr r2, =largest_valid_number
 	cmp r0, r2
 	ble double_dabble
 	ldr r0, =display_Err
-	bl exit
+	bal exit
 
 double_dabble:
 
-	ldr r2, =add_three
 	#initialize shift count
 	mov r12, #0
 	#move temporary number into r1
 	mov r1, r0
 1:
-	cmp r12, #14
+	#check if double dabble is on last shift
+	cmp r12, #last_shift
 	beq next
+
 	#shift the number left
 	lsl r1, #1
+
 	#increment the shift count
 	add r12, #1
 
-	#start switch statement for which nibble to check
-	cmp r12, #13
-	blt case2
-	#13-16 shifts
-	ubfx r3, r1, #28, #4
-	cmp r3, #5
-	blt 1b
+	#check first nibble
+	ubfx r0, r1, #16, #4
+	cmp r0, #five
+	blt second_nibble
+	ldr r2, =add_three_first_nibble
 	add r1, r2
-	bal 1b
-case2:
-	cmp r12, #9
-	blt case3
-	#9-12 shifts
-	ubfx r3, r1, #24, #4
-	cmp r3, #5
-	blt 1b
+
+second_nibble:
+
+	#check second nibble
+	ubfx r0, r1, #20, #4
+	cmp r0, #five
+	blt third_nibble
+	ldr r2, =add_three_second_nibble
 	add r1, r2
-	bal 1b
-case3:
-	cmp r12, #5
-	blt case4
-	#5-8 shifts
-	ubfx r3, r1, #20, #4
-	cmp r3, #5
-	blt 1b
+
+third_nibble:
+
+	#check third nibble
+	ubfx r0, r1, #24, #4
+	cmp r0, #five
+	blt fourth_nibble
+	ldr r2, =add_three_third_nibble
 	add r1, r2
-	bal 1b
-case4:
-	#1-4 shifts
-	ubfx r3, r1, #16, #4
-	cmp r3, #5
-	blt 1b
+
+fourth_nibble:
+
+	#check fourth nibble
+	ubfx r0, r1, #28, #4
+	cmp r0, #five
+	blt repeat
+	ldr r2, =add_three_fourth_nibble
 	add r1, r2
+
+repeat:
+
+	#repeat
 	bal 1b
 
 next:
+
+	#last shift with no add three
+	lsl r1, #1
+
 	#seperate numbers into separate registers
 	ubfx r0, r1, #16, #4
-	ubfx r5, r1, #20, #4
-	ubfx r6, r1, #24, #4
-	ubfx r7, r1, #28, #4
-	add r7, r7, #1
-	add r6, r6, #1
+	ubfx r3, r1, #20, #4
+	ubfx r4, r1, #24, #4
+	ubfx r5, r1, #28, #4
+
+	#add ascii conversion
+	ldrb r2, =num_to_ascii_convert
+	add r0, r2
+	add r3, r2
+	add r4, r2
+	add r5, r2
+
 	#reposition numbers
-	lsl r5, #8
-	lsl r6, #16
-	lsl r7, #24
-	#put numbers back together
+	lsl r3, #8
+	lsl r4, #16
+	lsl r5, #24
+
+#	#put numbers back together
+	orr r0, r3
+	orr r0, r4
 	orr r0, r5
-	orr r0, r6
-	orr r0, r7
-	#convert into ascii values
-	orr r0, #num_to_ascii_convert
 
 exit:
-	pop {r1-r7, r12}
+
+	pop {r1-r5, r12}
 	bx lr
