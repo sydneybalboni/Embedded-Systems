@@ -16,6 +16,8 @@
 
 #Define registers
 
+#R0: holds content to display onto LCD
+
 main:
 
 	bl LcdInit
@@ -23,6 +25,6 @@ main:
 	mov r0, #0x33
 
 
-//end:
-	//bal end
+end:
+	bal end
 

@@ -25,21 +25,16 @@
     .equ GPIO_ODR, 0x14
     .equ GPIO_BSRR, 0x18
 
-	.equ RS, 8
-	.equ RW, 9
-	.equ E, 10
+	.equ RS_SET, 1<<8
+	.equ RS_CLR, 1<<24
+	.equ RW_SET, 1<<9
+	.equ RW_CLR, 1<<25
+	.equ E_SET, 1<<10
+	.equ E_CLR, 1<<26
+	.equ DB_CLR, 0x0FF00000
+	.equ BSRR_RESET, 0xFFFF0000
 
-	.equ RS_SET, 1<<RS
-	.equ RS_CLR, 1<<(RS+16)
-	.equ RW_SET, 1<<RW
-	.equ RW_CLR, 1<<(RW+16)
-	.equ E_SET, 1<<E
-	.equ E_CLR, 1<<(E+16)
-	.equ DB_CLR, 0xFF<<16
-	.equ BSRR_CLR, 0x00000000
-
-	//DB0-DB7
-	.equ DB_PINS, 0xFF<<4
+	.equ DB_PINS, 0x00000FF0
 	.equ DB_PINS_OUTPUT_MODE, 0x555500
 	.equ RS_RW_EN_PINS, 0b111<<8
 	.equ RS_RW_E_OUTPUT_MODE, 0x150000
@@ -63,6 +58,10 @@
 #	None
 PortSetup:
 
+	#r1: RCC_BASE/GPIO
+	#r2: GPIOXEN/MODER
+	#r3: Output set masks
+
     push {r1-r3, lr}
 
     #Turn on Ports in RCC
@@ -77,7 +76,7 @@ PortSetup:
 	ldr r1, =GPIOA_BASE
 	ldr r2, [r1, #GPIO_MODER]
 	orr r2, r3
-	str r2, [r1, #GPIO_MODER] //Breaks
+	str r2, [r1, #GPIO_MODER]
 
 
     #Set RS, RW, and E Pins to Outputs
@@ -87,7 +86,7 @@ PortSetup:
 	orr r2, r3
 	str r2, [r1, #GPIO_MODER]
 
-	pop {r1-r3, lr}
+	pop {r1-r3, pc}
 
 #WriteInstruction
 #Writes an instruction to the LCD
@@ -100,48 +99,54 @@ PortSetup:
 WriteInstruction:
 #RS=0 RW=0  R1-Arg
 	#r1: DB
-	#r2: GPIO
-	#r3: BSRR
-	#r4: clr/set masks
-	push {r2-r4, lr}
+	#r2: Delay time
+	#r3: GPIO
+	#r4: BSRR
+	#r5: clr/set masks
+	push {r2-r5, lr}
 
 	#Clear RS, RW, and E bits
-	ldr r2, =GPIOC_BASE
-	ldr r3, [r2, #GPIO_BSRR]
+	ldr r3, =GPIOC_BASE
+	ldr r4, [r3, #GPIO_BSRR]
 	#Ensure bits are clear
-	mov r3, #BSRR_CLR
+	add r4, r4, 0x00000000
 	#Setup reset mask
-	ldr r4, =RS_CLR
-	orr r4, r4, #RW_CLR
-	orr r4, r4, #E_CLR
+	ldr r5, =RS_CLR
+	orr r5, r5, #RW_CLR
+	orr r5, r5, #E_CLR
 	#Apply reset mask
-	orr r3, r3, r4
+	orr r4, r4, r5
 	#Set RS=0,RW=0,E=0
-	str r3, [r2, #GPIO_BSRR]
+	str r4, [r3, #GPIO_BSRR]
 
 	#Set E=1
-	ldr r3, [r2, #GPIO_BSRR]
-	ldr r4, =E_SET
-	orr r3, r3, r4
-	str r3, [r2, #GPIO_BSRR]
+	ldr r4, [r3, #GPIO_BSRR]
+	ldr r5, =E_SET
+	orr r4, r4, r5
+	str r4, [r3, #GPIO_BSRR]
 
-	#Set R1 -> DataBus 
-	ldr r2, =GPIOA_BASE
-	ldr r3, [r2, #GPIO_BSRR]
-	ldr r3, =BSRR_CLR
-	mov r3, r1
-	str r3, [r2, #GPIO_BSRR]
-	
+	#Set R1 -> DataBus
+	#reset bits
+	ldr r3, =GPIOA_BASE
+	ldr r4, [r3, #GPIO_BSRR]
+	ldr r4, =BSRR_RESET
+	str r4, [r3, #GPIO_BSRR]
+	#set DB
+	ldr r3, =GPIOA_BASE
+	ldr r4, [r3, #GPIO_BSRR]
+	mov r4, r1
+	str r4, [r3, #GPIO_BSRR]
+
 	#Set E=0
-	ldr r3, [r2, #GPIO_BSRR]
-	ldr r4, =E_CLR
-	orr r3, r3, r4
-	str r3, [r2, #GPIO_BSRR]
+	ldr r4, [r3, #GPIO_BSRR]
+	ldr r5, =E_CLR
+	orr r4, r4, r5
+	str r4, [r3, #GPIO_BSRR]
 
 	#Wait for appropriate delay
 	bl LcdDelay
 
-	pop {r2-r4, lr}
+	pop {r2-r5, pc}
 
 
 #WriteData
@@ -153,18 +158,54 @@ WriteInstruction:
 #Dependancies:
 #	None
 WriteData:
-#RS=0 RW=0  R1-Arg
+	#r1: DB
+	#r2: Delay time
+	#r3: GPIO
+	#r4: BSRR
+	#r5: clr/set masks
 	push {r1, lr}
 
 	#Set RS=1,RW=0,E=0
+	ldr r3, =GPIOC_BASE
+	ldr r4, [r3, #GPIO_BSRR]
+	#Ensure bits are clear
+	add r4, r4, 0x00000000
+	#Setup mask
+	ldr r5, =RS_SET
+	orr r5, r5, #RW_CLR
+	orr r5, r5, #E_CLR
+	#Apply mask
+	orr r4, r4, r5
+	#Set RS=1,RW=0,E=0
+	str r4, [r3, #GPIO_BSRR]
 
 	#Set E=1
+	ldr r4, [r3, #GPIO_BSRR]
+	ldr r5, =E_SET
+	orr r4, r4, r5
+	str r4, [r3, #GPIO_BSRR]
 
 	#Set R1 -> DataBus 
+	#reset bits
+	ldr r3, =GPIOA_BASE
+	ldr r4, [r3, #GPIO_BSRR]
+	ldr r4, =BSRR_RESET
+	str r4, [r3, #GPIO_BSRR]
+	#set DB
+	ldr r3, =GPIOA_BASE
+	ldr r4, [r3, #GPIO_BSRR]
+	mov r4, r1
+	str r4, [r3, #GPIO_BSRR]
 	
 	#Set E=0
+	ldr r4, [r3, #GPIO_BSRR]
+	ldr r5, =E_CLR
+	orr r4, r4, r5
+	str r4, [r3, #GPIO_BSRR]
 
 	#Wait for appropriate delay
+	#TODO
+	bl LcdDelay
 
 	pop {r1, pc}
 
@@ -179,36 +220,43 @@ WriteData:
 LcdInit:
 
 	#r1: DB
-	push {r1}
+	#r2: delay time
+	push {r1-r2, lr}
 
     #Set up Ports
-    b PortSetup
+    bl PortSetup
 
     #Wait 40ms
-	bl LcdDelay
+    mov r2, #40
+	bl DelayMS
 
     #Write Function Set (0x38)
-	mov r1, #0x38
+	mov r1, #0x380
+	mov r2, #37
 	bl WriteInstruction
 
     #Write Function Set (0x38)
-    mov r1, #0x38
+    mov r1, #0x380
 	bl WriteInstruction
 
     #Write Display On/Off(0x0F)
-    mov r1, #0x0F
+    mov r1, #0x0F0
 	bl WriteInstruction
 
     #Write Display Clear (0x01)
-    mov r1, #0x01
+    mov r1, #0x010
+    mov r2, #1520
 	bl WriteInstruction
 
     #Write Entry Mode Set (0x06)
-    mov r1, #0x06
+    mov r1, #0x060
+    mov r2, #37
 	bl WriteInstruction
 
-	pop {r1}
-	bx lr
+	#cursor
+
+
+	pop {r1-r2, pc}
 
 #Write other global functions
 
@@ -293,31 +341,15 @@ LcdPrintString:
 #	None
 LcdPrintNum:
 #Include necessary delay
-	push {r1 }
+	#R0: number to display
+	#R2: delay
+	push {r2, lr}
 
-	pop {r1 }
-	bx lr
+	#Convert number to ascii
+	bl NumToAscii
 
-	#LcdDelay
-#Delays LCD instructions
-#Input:
-#	None
-#Output:
-#	None
-#Dependancies:
-#	None
-LcdDelay:
-#Helper function you probably want to move somewhere else...
-# about r1 microseonds
-	# stack
-	push {r1,lr}
 
-	mov r1, #400
-	lsl r1, r1, #3
 
-1:
-	subs r1, r1, #1
-	bne 1b
 
-	# return
-	pop {r1, lr}
+
+	pop {r2, pc}

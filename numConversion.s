@@ -27,7 +27,7 @@
 	.equ third_nibble, 24
 	.equ fourth_nibble, 28
 
-.global num_to_ascii
+.global NumToAscii
 
 #num_to_ascii
 #Takes an interger from 0-9999 and turns it into ascii
@@ -37,17 +37,17 @@
 #   r0 -num in ascii conversion
 #Dependancies:
 #   None
-num_to_ascii:
+NumToAscii:
 	push {r1-r5, r12}
 
 	#check for invalid number
 	mov r2, #largest_valid_number
 	cmp r0, r2
-	ble double_dabble
+	ble DoubleDabble
 	ldr r0, =display_Err
 	bal exit
 
-double_dabble:
+DoubleDabble:
 
 	#initialize shift count
 	mov r12, #0

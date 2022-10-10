@@ -10,7 +10,7 @@
 .thumb
 .section .text
 
-.global delay_ms
+.global DelayMS
 .global LcdDelay
 
 
@@ -18,19 +18,18 @@
 #delay_ms
 #Busy delay loop for ~N millisec
 #Input:
-#	r1 - Number of milliseconds (Arg >0)
+#	r2 - Number of milliseconds (Arg >0)
 #Output:
 #   None
 #Dependancies:
 #   None
-delay_ms:
-
+DelayMS:
 	push {r1-r2}
 
-	mov r2, #5333
-	mul r1, r1, r2
+	mov r1, #5333
+	mul r2, r2, r1
 1:
-	subs r1,r1,#1
+	subs r2,r2,#1
 	bne 1b
 
 
@@ -38,4 +37,24 @@ delay_ms:
 	bx lr
 
 
+	#LcdDelay
+#Delays LCD instructions
+#Input:
+#	r2: number of microseconds
+#Output:
+#	None
+#Dependancies:
+#	None
+LcdDelay:
+# about r2 microseconds
+	# stack
+	push {r2,lr}
 
+	lsl r2, r2, #3
+
+1:
+	subs r2, r2, #1
+	bne 1b
+
+	# return
+	pop {r2, pc}
