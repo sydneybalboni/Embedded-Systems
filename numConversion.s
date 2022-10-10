@@ -12,16 +12,20 @@
 
 	.equ display_Err, 0x53989846
 	.equ num_to_ascii_convert, 0x32
-	.equ largest_valid_number, 0x270F
+	.equ largest_valid_number, 9999
 
 	.equ add_three_first_nibble, 0x30000
 	.equ add_three_second_nibble, 0x300000
 	.equ add_three_third_nibble, 0x3000000
 	.equ add_three_fourth_nibble, 0x30000000
 
+	.equ nibble, 4
+	.equ first_nibble, 16
 	.equ last_shift, 15
 	.equ five, 5
-
+	.equ second_nibble, 20
+	.equ third_nibble, 24
+	.equ fourth_nibble, 28
 
 .global num_to_ascii
 
@@ -37,7 +41,7 @@ num_to_ascii:
 	push {r1-r5, r12}
 
 	#check for invalid number
-	ldr r2, =largest_valid_number
+	mov r2, #largest_valid_number
 	cmp r0, r2
 	ble double_dabble
 	ldr r0, =display_Err
@@ -61,7 +65,7 @@ double_dabble:
 	add r12, #1
 
 	#check first nibble
-	ubfx r0, r1, #16, #4
+	ubfx r0, r1, #first_nibble, #nibble
 	cmp r0, #five
 	blt second_nibble
 	ldr r2, =add_three_first_nibble
@@ -70,7 +74,7 @@ double_dabble:
 second_nibble:
 
 	#check second nibble
-	ubfx r0, r1, #20, #4
+	ubfx r0, r1, #20, #nibble
 	cmp r0, #five
 	blt third_nibble
 	ldr r2, =add_three_second_nibble
@@ -79,7 +83,7 @@ second_nibble:
 third_nibble:
 
 	#check third nibble
-	ubfx r0, r1, #24, #4
+	ubfx r0, r1, #24, #nibble
 	cmp r0, #five
 	blt fourth_nibble
 	ldr r2, =add_three_third_nibble
@@ -88,7 +92,7 @@ third_nibble:
 fourth_nibble:
 
 	#check fourth nibble
-	ubfx r0, r1, #28, #4
+	ubfx r0, r1, #28, #nibble
 	cmp r0, #five
 	blt repeat
 	ldr r2, =add_three_fourth_nibble
@@ -105,10 +109,10 @@ next:
 	lsl r1, #1
 
 	#seperate numbers into separate registers
-	ubfx r0, r1, #16, #4
-	ubfx r3, r1, #20, #4
-	ubfx r4, r1, #24, #4
-	ubfx r5, r1, #28, #4
+	ubfx r0, r1, #16, #nibble
+	ubfx r3, r1, #20, #nibble
+	ubfx r4, r1, #24, #nibble
+	ubfx r5, r1, #28, #nibble
 
 	#add ascii conversion
 	ldrb r2, =num_to_ascii_convert

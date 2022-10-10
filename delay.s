@@ -11,6 +11,7 @@
 .section .text
 
 .global delay_ms
+.global LcdDelay
 
 
 
@@ -35,3 +36,6 @@ delay_ms:
 
 	pop {r1-r2}
 	bx lr
+
+
+
