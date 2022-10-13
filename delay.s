@@ -15,15 +15,16 @@
 
 
 
-#delay_ms
+#DelayMS
 #Busy delay loop for ~N millisec
 #Input:
-#	r2 - Number of milliseconds (Arg >0)
+#	r2: Number of milliseconds (Arg >0)
 #Output:
 #   None
 #Dependancies:
 #   None
 DelayMS:
+
 	push {r1-r2}
 
 	mov r1, #5333
@@ -32,29 +33,25 @@ DelayMS:
 	subs r2,r2,#1
 	bne 1b
 
-
 	pop {r1-r2}
 	bx lr
 
 
-	#LcdDelay
+#LcdDelay
 #Delays LCD instructions
 #Input:
-#	r2: number of microseconds
+#	r2: Number of microseconds
 #Output:
 #	None
 #Dependancies:
 #	None
 LcdDelay:
-# about r2 microseconds
-	# stack
+
 	push {r2,lr}
 
 	lsl r2, r2, #3
-
 1:
 	subs r2, r2, #1
 	bne 1b
 
-	# return
 	pop {r2, pc}

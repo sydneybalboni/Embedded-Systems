@@ -3,31 +3,31 @@
 #10/02/2022
 #
 #numConversion.s
-#
+#Functionality for converting decimal numbers into ascii codes
 
 .syntax unified
 .cpu cortex-m4
 .thumb
 .section .text
 
-	.equ display_Err, 0x53989846
-	.equ num_to_ascii_convert, 0x32
-	.equ largest_valid_number, 9999
+	.equ DISPLAY_ERROR, 0x4572722E
+	.equ NUM_TO_ASCII_CONVERT, 0x30
+	.equ LARGEST_VALID_NUMBER, 9999
 
-	.equ add_three_first_nibble, 0x30000
-	.equ add_three_second_nibble, 0x300000
-	.equ add_three_third_nibble, 0x3000000
-	.equ add_three_fourth_nibble, 0x30000000
+	.equ ADD_THREE_FIRST_NIBBLE, 0x30000
+	.equ ADD_THREE_SECOND_NIBBLE, 0x300000
+	.equ ADD_THREE_THIRD_NIBBLE, 0x3000000
+	.equ ADD_THREE_FOURTH_NIBBLE, 0x30000000
 
-	.equ nibble, 4
-	.equ first_nibble, 16
-	.equ last_shift, 15
-	.equ five, 5
-	.equ second_nibble, 20
-	.equ third_nibble, 24
-	.equ fourth_nibble, 28
+	.equ NIBBLE, 4
+	.equ FIRST_NIBBLE, 16
+	.equ LAST_SHIFT, 15
+	.equ SECOND_NIBBLE, 20
+	.equ THIRD_NIBBLE, 24
+	.equ FOURTH_NIBBLE, 28
 
 .global NumToAscii
+
 
 #num_to_ascii
 #Takes an interger from 0-9999 and turns it into ascii
@@ -38,100 +38,101 @@
 #Dependancies:
 #   None
 NumToAscii:
-	push {r1-r5, r12}
+
+	push {r1-r6}
 
 	#check for invalid number
-	mov r2, #largest_valid_number
+	mov r2, #LARGEST_VALID_NUMBER
 	cmp r0, r2
 	ble DoubleDabble
-	ldr r0, =display_Err
-	bal exit
+	ldr r0, =DISPLAY_ERROR
+	bal Exit
 
 DoubleDabble:
 
-	#initialize shift count
-	mov r12, #0
-	#move temporary number into r1
+	#Initialize shift count
+	mov r6, #0
+	#Move temporary number into r1
 	mov r1, r0
 1:
-	#check if double dabble is on last shift
-	cmp r12, #last_shift
-	beq next
+	#Check if double dabble is on last shift
+	cmp r6, #LAST_SHIFT
+	beq Next
 
-	#shift the number left
+	#Shift the number left
 	lsl r1, #1
 
-	#increment the shift count
-	add r12, #1
+	#Increment the shift count
+	add r6, #1
 
-	#check first nibble
-	ubfx r0, r1, #first_nibble, #nibble
-	cmp r0, #five
-	blt second_nibble
-	ldr r2, =add_three_first_nibble
+	#Check first nibble
+	ubfx r0, r1, #FIRST_NIBBLE, #NIBBLE
+	cmp r0, #5
+	blt SecondNibble
+	ldr r2, =ADD_THREE_FIRST_NIBBLE
 	add r1, r2
 
-second_nibble:
+SecondNibble:
 
-	#check second nibble
-	ubfx r0, r1, #20, #nibble
-	cmp r0, #five
-	blt third_nibble
-	ldr r2, =add_three_second_nibble
+	#Check second nibble
+	ubfx r0, r1, #20, #NIBBLE
+	cmp r0, #5
+	blt ThirdNibble
+	ldr r2, =ADD_THREE_SECOND_NIBBLE
 	add r1, r2
 
-third_nibble:
+ThirdNibble:
 
-	#check third nibble
-	ubfx r0, r1, #24, #nibble
-	cmp r0, #five
-	blt fourth_nibble
-	ldr r2, =add_three_third_nibble
+	#Check third nibble
+	ubfx r0, r1, #24, #NIBBLE
+	cmp r0, #5
+	blt FourthNibble
+	ldr r2, =ADD_THREE_THIRD_NIBBLE
 	add r1, r2
 
-fourth_nibble:
+FourthNibble:
 
-	#check fourth nibble
-	ubfx r0, r1, #28, #nibble
-	cmp r0, #five
-	blt repeat
-	ldr r2, =add_three_fourth_nibble
+	#Check fourth nibble
+	ubfx r0, r1, #28, #NIBBLE
+	cmp r0, #5
+	blt Repeat
+	ldr r2, =ADD_THREE_FOURTH_NIBBLE
 	add r1, r2
 
-repeat:
+Repeat:
 
-	#repeat
+	#Repeat
 	bal 1b
 
-next:
+Next:
 
-	#last shift with no add three
+	#Last shift with no add three
 	lsl r1, #1
 
-	#seperate numbers into separate registers
-	ubfx r0, r1, #16, #nibble
-	ubfx r3, r1, #20, #nibble
-	ubfx r4, r1, #24, #nibble
-	ubfx r5, r1, #28, #nibble
+	#Seperate numbers into separate registers
+	ubfx r0, r1, #16, #NIBBLE
+	ubfx r3, r1, #20, #NIBBLE
+	ubfx r4, r1, #24, #NIBBLE
+	ubfx r5, r1, #28, #NIBBLE
 
-	#add ascii conversion
-	ldrb r2, =num_to_ascii_convert
+	#Add ascii conversion
+	ldrb r2, =NUM_TO_ASCII_CONVERT
 	add r0, r2
 	add r3, r2
 	add r4, r2
 	add r5, r2
 
-	#reposition numbers
+	#Reposition numbers
 	lsl r3, #8
 	lsl r4, #16
 	lsl r5, #24
 
-#	#put numbers back together
+	#Put numbers back together
 	orr r0, r3
 	orr r0, r4
 	orr r0, r5
 
-exit:
+Exit:
 
-	pop {r1-r5, r12}
+	pop {r1-r6}
 	bx lr

@@ -8,6 +8,7 @@
 .syntax unified
 .cpu cortex-m4
 .thumb
+
 .section .text
 
 	.equ RCC_BASE, 0x40023800
@@ -15,14 +16,11 @@
     .equ RCC_GPIOAEN, 1
     .equ RCC_GPIOCEN, 1<<2
 
-	//DB Pins
     .equ GPIOA_BASE, 0x40020000
-
-    //RS, RW, E pins
     .equ GPIOC_BASE, 0x40020800
-
     .equ GPIO_MODER, 0x00
     .equ GPIO_ODR, 0x14
+    .equ GPIO_IDR, 0x10
     .equ GPIO_BSRR, 0x18
 
 	.equ RS_SET, 1<<8
@@ -36,10 +34,16 @@
 
 	.equ DB_PINS, 0x00000FF0
 	.equ DB_PINS_OUTPUT_MODE, 0x555500
-	.equ RS_RW_EN_PINS, 0b111<<8
 	.equ RS_RW_E_OUTPUT_MODE, 0x150000
+	.equ RS_RW_EN_PINS, 0b111<<8
+	.equ LCD_CLEAR, 1
+	.equ LCD_HOME, 2
 
-	.equ DB_CLEAR, 1
+	.equ FUNCTION_SET, 0x38
+	.equ TURN_DISPLAY_ON, 0x0F
+	.equ DISPLAY_CLEAR, 0x01
+	.equ ENTRY_MODE_SET, 0x06
+
 
 .global LcdInit
 .global LcdPrintNum
@@ -48,13 +52,14 @@
 .global LcdHome
 .global LcdSetPosition
 
-#
-#
+
+#PortSetup
+#Initializes the pins needed in the usage of the LCD
 #Input:
 #	None
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 PortSetup:
 
@@ -78,7 +83,6 @@ PortSetup:
 	orr r2, r3
 	str r2, [r1, #GPIO_MODER]
 
-
     #Set RS, RW, and E Pins to Outputs
     ldr r3, =RS_RW_E_OUTPUT_MODE
 	ldr r1, =GPIOC_BASE
@@ -88,65 +92,82 @@ PortSetup:
 
 	pop {r1-r3, pc}
 
+
+#LcdWrite
+#Initializes the pins needed in the usage of the LCD
+#Input:
+#	None
+#Output:
+#	None
+#Dependencies:
+#	None
+LcdWrite:
+
+	#r1: DB
+	#r2: Delay time
+	#r3: GPIO
+	#r4: BSRR
+	#r5: CLR/SET masks
+
+	push {r2-r5, lr}
+
+	#Write DB
+	ldr r3, =GPIOA_BASE
+	ldr r4, [r3, #GPIO_ODR]
+	#clear output
+	bic r4, r4, (0xFF<<4)
+	lsl r1, r1, #4
+	orr r4, r4, r1
+	str r4, [r3, #GPIO_ODR]
+
+	#Set and reset control bits
+	ldr r3, =GPIOC_BASE
+	#RW=0, E=1
+	mov r4, #RW_CLR
+	orr r4, r5, #E_SET
+	str r4, [r3, #GPIO_BSRR]
+
+	#Delay for toggling E
+	mov r2, #50
+	bl LcdDelay
+
+	#E=0
+	mov r4, #E_CLR
+	str r4, [r3, #GPIO_BSRR]
+
+	#Delay for toggling E
+	mov r1, #37
+	bl LcdDelay
+
+	pop {r2-r5, pc}
+
+
 #WriteInstruction
 #Writes an instruction to the LCD
 #Input:
 #	R1: Databus to write
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 WriteInstruction:
-#RS=0 RW=0  R1-Arg
+
 	#r1: DB
-	#r2: Delay time
-	#r3: GPIO
-	#r4: BSRR
-	#r5: clr/set masks
-	push {r2-r5, lr}
+	#r2: GPIO
+	#r3: Clear mask
 
-	#Clear RS, RW, and E bits
-	ldr r3, =GPIOC_BASE
-	ldr r4, [r3, #GPIO_BSRR]
-	#Ensure bits are clear
-	add r4, r4, 0x00000000
-	#Setup reset mask
-	ldr r5, =RS_CLR
-	orr r5, r5, #RW_CLR
-	orr r5, r5, #E_CLR
-	#Apply reset mask
-	orr r4, r4, r5
-	#Set RS=0,RW=0,E=0
-	str r4, [r3, #GPIO_BSRR]
+	push {r2-r3, lr}
 
-	#Set E=1
-	ldr r4, [r3, #GPIO_BSRR]
-	ldr r5, =E_SET
-	orr r4, r4, r5
-	str r4, [r3, #GPIO_BSRR]
+	//Clear RS
+	ldr r2, =GPIOC_BASE
+	mov r3, #RS_CLR
+	str r3, [r2, #GPIO_BSRR]
 
-	#Set R1 -> DataBus
-	#reset bits
-	ldr r3, =GPIOA_BASE
-	ldr r4, [r3, #GPIO_BSRR]
-	ldr r4, =BSRR_RESET
-	str r4, [r3, #GPIO_BSRR]
-	#set DB
-	ldr r3, =GPIOA_BASE
-	ldr r4, [r3, #GPIO_BSRR]
-	mov r4, r1
-	str r4, [r3, #GPIO_BSRR]
+	//Call the write subroutine
+	bl LcdWrite
 
-	#Set E=0
-	ldr r4, [r3, #GPIO_BSRR]
-	ldr r5, =E_CLR
-	orr r4, r4, r5
-	str r4, [r3, #GPIO_BSRR]
-
-	#Wait for appropriate delay
-	bl LcdDelay
-
-	pop {r2-r5, pc}
+	pop {r2-r3, pc}
+	bx lr
 
 
 #WriteData
@@ -155,59 +176,27 @@ WriteInstruction:
 #	R1: Databus to write
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 WriteData:
+
 	#r1: DB
-	#r2: Delay time
-	#r3: GPIO
-	#r4: BSRR
-	#r5: clr/set masks
-	push {r1, lr}
+	#r2: GPIO
+	#r3: Set mask
 
-	#Set RS=1,RW=0,E=0
-	ldr r3, =GPIOC_BASE
-	ldr r4, [r3, #GPIO_BSRR]
-	#Ensure bits are clear
-	add r4, r4, 0x00000000
-	#Setup mask
-	ldr r5, =RS_SET
-	orr r5, r5, #RW_CLR
-	orr r5, r5, #E_CLR
-	#Apply mask
-	orr r4, r4, r5
-	#Set RS=1,RW=0,E=0
-	str r4, [r3, #GPIO_BSRR]
+	push {r2-r3, lr}
 
-	#Set E=1
-	ldr r4, [r3, #GPIO_BSRR]
-	ldr r5, =E_SET
-	orr r4, r4, r5
-	str r4, [r3, #GPIO_BSRR]
+	//Set RS
+	ldr r2, =GPIOC_BASE
+	mov r3, #RS_SET
+	str r3, [r2, #GPIO_BSRR]
 
-	#Set R1 -> DataBus 
-	#reset bits
-	ldr r3, =GPIOA_BASE
-	ldr r4, [r3, #GPIO_BSRR]
-	ldr r4, =BSRR_RESET
-	str r4, [r3, #GPIO_BSRR]
-	#set DB
-	ldr r3, =GPIOA_BASE
-	ldr r4, [r3, #GPIO_BSRR]
-	mov r4, r1
-	str r4, [r3, #GPIO_BSRR]
-	
-	#Set E=0
-	ldr r4, [r3, #GPIO_BSRR]
-	ldr r5, =E_CLR
-	orr r4, r4, r5
-	str r4, [r3, #GPIO_BSRR]
+	//Call the write subroutine
+	bl LcdWrite
 
-	#Wait for appropriate delay
-	#TODO
-	bl LcdDelay
+	pop {r2-r3, lr}
+	bx lr
 
-	pop {r1, pc}
 
 #LcdInit
 #Initializes the LCD
@@ -215,7 +204,7 @@ WriteData:
 #	None
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 LcdInit:
 
@@ -230,35 +219,34 @@ LcdInit:
     mov r2, #40
 	bl DelayMS
 
-    #Write Function Set (0x38)
-	mov r1, #0x380
-	mov r2, #37
+    #Write Function Set
+	mov r1, #FUNCTION_SET
 	bl WriteInstruction
+	bl DelayMS
 
-    #Write Function Set (0x38)
-    mov r1, #0x380
+    #Write Function Set
+    mov r1, #FUNCTION_SET
 	bl WriteInstruction
+	bl DelayMS
 
-    #Write Display On/Off(0x0F)
-    mov r1, #0x0F0
+    #Write Display On/Off
+    mov r1, #TURN_DISPLAY_ON
 	bl WriteInstruction
+	bl DelayMS
 
-    #Write Display Clear (0x01)
-    mov r1, #0x010
+    #Write Display Clear
+    mov r1, #DISPLAY_CLEAR
     mov r2, #1520
 	bl WriteInstruction
+	bl DelayMS
 
-    #Write Entry Mode Set (0x06)
-    mov r1, #0x060
+    #Write Entry Mode Set
+    mov r1, #ENTRY_MODE_SET
     mov r2, #37
 	bl WriteInstruction
 
-	#cursor
-
-
 	pop {r1-r2, pc}
 
-#Write other global functions
 
 #LcdClear
 #Clears the LCD
@@ -266,23 +254,21 @@ LcdInit:
 #	None
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 LcdClear:
 	#Include the necessary delay
-	push {r1 }
+	push {r1, lr}
 
-	ldr r1, =GPIOA_BASE
-	ldr r2, [r1, #GPIO_BSRR]
+	ldr r1, =LCD_CLEAR
+	bl WriteInstruction
 
+	mov r2, #152
+	bl LcdDelay
 
-
-	ldr r3, =DB_CLEAR
-
-
-
-	pop {r1 }
+	pop {r1, pc}
 	bx lr
+
 
 #LcdHome
 #Moves cursor to the home position
@@ -290,14 +276,21 @@ LcdClear:
 #	None
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 LcdHome:
 	#Include the necessary delay
-	push {r1 }
+	push {r1, lr }
 
-	pop {r1 }
+	ldr r1, =LCD_HOME
+	bl WriteInstruction
+
+	mov r2, #152
+	bl LcdDelay
+
+	pop {r1, pc}
 	bx lr
+
 
 #LcdSetPosition
 #Moves cursor to the position indicated
@@ -306,14 +299,21 @@ LcdHome:
 #	R1: Column
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 LcdSetPosition:
 #Include necessary delay
-	push { r1}
+	push {r2, lr}
+	#Shift row to bit 6
+	lsl r0, r0, #6
+	#Add row
+	orr r1, r1, r0
+	#Set instruction bit
+	orr r1, r1, #(1<<7)
+	#Send instruction
+	bl WriteInstruction
+	pop {r2, pc}
 
-	pop {r1 }
-	bx lr
 
 #LcdPrintString
 #Prints a string to the LCD
@@ -321,15 +321,37 @@ LcdSetPosition:
 #	R0: Address of null-terminated string
 #Output:
 #	R0: Number of characters written to the display
-#Dependancies:
+#Dependencies:
 #	None
 LcdPrintString:
-#remember necessary delay
 
-	push {r1 }
+	#r0: String address/number of characters
+	#r1: DB
+	#r2: Delay
+	#r3: Address shifter TODO
 
-	pop {r1 }
-	bx lr
+	push {r1-r3, lr}
+
+	#Address shifter
+	mov r3, #0
+
+	#Load the value at the string memory address into r1,
+	#shifted by the address shifter
+1:	ldrb r1, [r0, r3]
+	#Check for null terminator
+	cmp r1, #0
+	beq end
+	#Display
+	bl WriteData
+	#Shift the address over a byte
+	add r3, #1
+	b 1b
+
+end:
+	#Return character count
+	add r0, r3, #1
+	pop {r1-r3, pc}
+
 
 #LcdPrintNum
 #Prints a number to the LCD
@@ -337,19 +359,82 @@ LcdPrintString:
 #	R0: Number to be printed within 0-9999
 #Output:
 #	None
-#Dependancies:
+#Dependencies:
 #	None
 LcdPrintNum:
-#Include necessary delay
-	#R0: number to display
-	#R2: delay
-	push {r2, lr}
+
+	#r0: Number to display
+	#r1: DB
+	#r2: Delay
+	#r3: First number
+	#r4: Second number
+	#r5: Third number
+	#r6: Fourth number
+
+	push {r2-r6, lr}
 
 	#Convert number to ascii
 	bl NumToAscii
 
+	#Break up individual numbers
+	ubfx r3, r0, #0, #8
+	ubfx r4, r0, #8, #8
+	ubfx r5, r0, #16, #8
+	ubfx r6, r0, #24, #8
+
+	#Setup delay
+	mov r2, #40
+	bl DelayMS
+	#First number
+	mov r1, r6
+	bl WriteData
+	bl DelayMS
+	#Second number
+	mov r1, r5
+	bl WriteData
+	bl DelayMS
+	#Third number
+	mov r1, r4
+	bl WriteData
+	bl DelayMS
+	#Fourth number
+	mov r1, r3
+	bl WriteData
+	bl DelayMS
+
+	pop {r2-r6, pc}
+
+#CheckBusyFlag
+#Repeatedly checks the busy flag until it is down
+#Input:
+#	None
+#Output:
+#	None
+#Dependencies:
+#	None
+CheckBusyFlag:
+
+	#r1: GPIO/busy flag
+	#r2: Mask/Input
+
+	push {r1-r3, lr}
+
+	#RS=0, RW=1
+	ldr r1, =GPIOC_BASE
+	ldr r2, =RW_SET
+	orr r2, r2, #RS_CLR
+	str r2, [r1, #GPIO_BSRR]
+1:
+	#Check the busy flag
+	ldr r1, =GPIOA_BASE
+	ldr r2, [r1, #GPIO_IDR]
+	#Isolate busy flag
+	ubfx r1, r2, #11, #1
+	#Check if busy flag is down
+	cmp r1, #0
+	#Check again if busy flag is high
+	bne 1b
+
+	pop {r1-r3, pc}
 
 
-
-
-	pop {r2, pc}
