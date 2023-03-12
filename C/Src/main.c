@@ -4,11 +4,6 @@
  * @author  Sydney Balboni
  * @version V1.0
  * @brief   Driver for console reading and writing to memory
- *
- * @paragraph I had a good experience with this lab. This lab was a great 
- * opportunity for me to learn how to utilize interupts.The hardest part of 
- * this lab was debugging to figure out why my printf statements weren't
- * functioning correctly.
  ******************************************************************************
  */
 
