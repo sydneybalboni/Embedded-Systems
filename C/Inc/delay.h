@@ -11,7 +11,7 @@
 #define DELAY_H
 
 //CPU Frequency
-#define F_CPU 16000000UL
+//#define F_CPU 16000000UL
 
 // SysTivk registers
 #define SYSTICK_BASE 0xE000E010

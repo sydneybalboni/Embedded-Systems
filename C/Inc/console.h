@@ -11,8 +11,6 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#define F_CPU 16000000UL
-
 // Prototypes
 void initialPrompt(void);
 void acceptInput(char* str);

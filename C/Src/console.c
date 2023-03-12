@@ -11,10 +11,12 @@
 #include "uart_driver.h"
 #include <string.h>
 #include <inttypes.h>
+#include "frequency.h"
 
 static void readMemoryWord(uint32_t* ptr);
 static void writeMemoryWord(uint32_t* ptr, uint32_t value);
 static void dumpMemory(uint8_t*, int);
+static void songPlay(char*);
 static void prompt(void);
 static void help(void);
 static void invalidInput(void);
@@ -36,10 +38,16 @@ void initialPrompt(void)
 static void prompt(void) 
 {
     printf("\nType one of the following commands:\n"
-    			"	Read memory word:   rmw [address]\n"
-                "	Write memory word:  wmw [address] [value]\n"
-                "	Memory dump word:   dm [address] [number of bytes]\n"
-                "	Help:               help\n\n");
+    			"	Read memory word:           rmw [address]\n"
+                "	Write memory word:          wmw [address] [value]\n"
+                "	Memory dump word:           dm [address] [number of bytes]\n"
+                "	Play Harry Potter:          harry_potter\n"
+                "	Play Sweet Child of Mine:   sweet_child_of_mine\n"
+                "	Help:                       help\n"
+    			"        Play background             [song name]_background\n"
+                "        Measure frequency           measure_freq\n"
+                "        Collect wave                collect [amount] [rate]\n"
+                "        Get wave                    getwave\n\n");
 
     return;
 }
@@ -49,38 +57,66 @@ static void prompt(void)
 */
 void acceptInput(char* str)
 {
-    char command[5];
-    unsigned int address;
-    char values[99];
+    char command[30];
+    char value1[99];
+    char value2[99];
 
-    sscanf(str, "%s %x %s", command, &address, values);
+    sscanf(str, "%s %s %s", command, value1, value2);
 
-    uint32_t value = strtoul(values, NULL, 0);
+    //uint32_t value = strtoul(value2, NULL, 0);
 
-    if (address % 4)
-    {
-        printf("Please use address starting on a word boundary. ");
-        command[0] = 0;
-    }
+    // if ((address % 4) != 0)
+    // {
+    //     printf("Please use address starting on a word boundary. ");
+    //     return;
+    // }
 
-    uint32_t* const ptr = (uint32_t*) address;
+    uint32_t* const ptr = (uint32_t*) strtoul(value1, NULL, 0);
 
     if (strcmp(command, "rmw") ==0)
     {
         readMemoryWord(ptr);
     } 
+    else if (strcmp(command, "measure_freq") == 0)
+    {
+        getFreqy();
+    }
     else if (strcmp(command, "wmw") == 0)
     {
-        writeMemoryWord(ptr, value);
+        writeMemoryWord(ptr, ((uint32_t)strtoul(value2, NULL, 0)));
     } 
     else if (strcmp(command, "dm") == 0)
     {
-        dumpMemory((uint8_t*)ptr, value);
+        dumpMemory((uint8_t*) ptr, (int)strtoul(value2, NULL, 0));
     } 
     else if (strcmp(command, "help") == 0)
 	{
     	help();
 	}
+    else if (strcmp(command, "collect") == 0)
+    {   
+        collectSamples((int)strtoul(value1, NULL, 0), (int)strtoul(value2, NULL, 0));
+    }
+    else if (strcmp(command, "harry_potter") == 0)
+    {   
+        songPlay(command);
+    }
+    else if (strcmp(command, "sweet_child_of_mine") == 0)
+    {
+        songPlay(command);
+    }
+    else if (strcmp(command, "getwave")== 0)
+    {
+        retrieveSamples();
+    }
+    else if (strcmp(command, "harry_potter_background")== 0)
+    {   
+        songPlay(command);
+    }
+    else if (strcmp(command, "sweet_child_of_mine_background")== 0)
+    {
+        songPlay(command);
+    }
     else 
     {
         invalidInput();
@@ -140,6 +176,17 @@ static void dumpMemory(uint8_t* ptr, int bytes)
 		 ++ptr; 
 	 }
 	 return;
+}
+
+/**
+ * Plays a requested song
+ * 
+ * @param song the song to be played
+*/
+static void songPlay(char* song)
+{
+	songSelect(song);
+    return;
 }
 
 /**
